@@ -1,0 +1,88 @@
+---
+title: "Assignment 5: API Data - People in Space"
+author: "Elizabeth Mastilak"
+format: 
+  html:
+    embed-resources: TRUE
+execute: 
+  warning: FALSE
+  message: FALSE
+editor: visual
+---
+
+## Introduction: Starliner
+
+### Boeing Leaves Astronauts Stranded
+
+2024 has been a big year for astronomical events. In the past year alone, we have witnessed a solar eclipse, the aurora borealis, and the SpaceX booster catch just to name a few. However, 2024 has also been a year of tragedy and difficulty surrounding issues with Boeing's air and space craft. Boeing has combined the wonder of the stars with the tragedy of their failures in the saga of their Starliner spacecraft and two stranded astronauts.
+
+On June 5, 2024, Starliner was launched into space with NASA astronauts Sunita Williams and Barry Wilmore. Starliner docked at the International Space Station (ISS) on June 6. Soon, however, problems with the spacecraft became apparent and Starliner was deemed unsafe for a return flight. With crews on the ground scrambling for a way to undock Starliner (which was now blocking a port on the ISS), many were wondering how Williams and Wilmore would be returned to earth.
+
+### SpaceX Offers to Bring Them Home
+
+Eventually, solutions were proposed and accepted for both removing the Starliner from the ISS and bringing the astronauts home. For the first problem, new software was uploaded to allow Boeing's Starliner to be remotely undocked and piloted to earth. On September 6, 2024, the Starliner was remotely undocked from the ISS and sent on it's way, leaving Williams and Wilmore behind in space. Terrifyingly, this removal of the Starliner meant that any issues on the ISS requiring evacuation would leave astronauts trapped in space without a way to escape as there wasn't enough room on the functional spacecraft at the ISS to evacuate all personnel.
+
+For the second problem, the Crew-9 mission aboard a SpaceX Crew Dragon spacecraft would be responsible for returning Williams and Wilmore to solid ground, but not until Februrary of 2025, 8 months after the Starliner's launch date. On September 28, SpaceX launched their Dragon spacecraft with 2 of the 4 crew members who were originally assigned to this mission. The two empty seats would then be taken by Williams and Wilmore on the return trip in February. Williams and Wilmore would assist the Dragon crew in the work that was originally planned for their mission which would allow everything to get back on track.
+
+Because of the issues with Starliner, however, the people who are in space as of today are not the people who were supposed to be in space in October of 2024. As this is the case, I chose to explore the number of people who are in space currently through the API provided on Open Notify.
+
+## Open Notify's People in Space API
+
+### About the API
+
+Data regarding the number of people in space is provided for free and without requiring an API key on Open Notify. Thus, we are able to access the information quickly and easily.
+
+### Accessing the Data
+
+As always, our first step is to load packages.
+
+```{r}
+#| label: load packages
+library(tidyverse) # All the tidy things
+library(jsonlite)  # Converting json data into data frames
+library(magrittr)  # Extracting items from list objects using piping grammar
+library(httr)      # Interacting with HTTP verbs
+library(knitr)     # For Quarto functionality
+```
+
+Next, we want to define our endpoint. This is helpfully done for us in Open Notify's API documentation.
+
+```{r}
+#| label: define the endpoint
+astros_endpoint <- "http://api.open-notify.org/astros.json"
+```
+
+To retrieve the data, we need to make a call to the API. As the service does not require an API key, the call can be done by using a `GET()` command to retrieve the data through the endpoint. The result should then be taken from the JSON format. A `use_series()` function pulls the data from the "people" list in the output. The "people" list contains the data we are interested in. The output is a data frame that includes the names of the people and the spacecraft they are located on.
+
+```{r, eval = FALSE}
+#| label: make the call
+astros_data <- 
+  GET(astros_endpoint) %>% 
+  content(as = "text", encoding = "UTF-8") %>% 
+  fromJSON() %>% 
+  use_series(people)
+```
+
+To prevent issues that may arise in the event of changes to the API, I have loaded the data from the above API call into a CSV and loaded it into this report.
+
+```{r, eval = FALSE}
+#| label: making the csv
+write_csv(astros_data, "astros_data.csv")
+```
+
+```{r}
+#| label: loading in the csv data
+astronauts <- 
+  read_csv("astros_data.csv")
+astronauts
+```
+
+### What is Tiangong?
+
+Not well known by the American public, Tiangong is the Chinese space station. It is about 1/3 of the size of the ISS. It usually holds 3 people. The current commander is Ye Guangfu.
+
+## Why Use the API?
+
+As Tiangong missions are not widely publicized in the United States, this API is especially useful for easily checking to see who is on Tiangong. Even the Wikipedia page doesn't include all three Chinese astronauts aboard Tiangong.
+
+It will also be fun to check on in February when the SpaceX Crew-9 mission comes home. At that time, Sunita Williams and Barry Wilmore will make their long-awaited return to their planet, their homes, and their families.

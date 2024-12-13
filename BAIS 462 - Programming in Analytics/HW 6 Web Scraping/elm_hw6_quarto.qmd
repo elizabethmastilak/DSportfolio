@@ -1,0 +1,163 @@
+---
+title: "HW 6: Web Scraping"
+author: "Elizabeth Mastilak"
+format:                   # Options related to formatting.
+  html:                   # Options related to HTML output.
+    # code-tools: TRUE      # Allow the code tools option showing in the output.
+    embed-resources: TRUE # Embeds all components into a single HTML file. 
+execute:                  # Options related to the execution of code chunks.
+  warning: FALSE          # FALSE: Code chunk sarnings are hidden by default.
+  message: FALSE          # FALSE: Code chunk messages are hidden by default.
+  echo:    FALSE           # TRUE:  Show all code in the output.
+editor: visual
+---
+
+# Ethical Web Scraping: Goodreads
+
+## Introduction
+
+### Goodreads
+
+Goodreads is a website that allows users to find information on books. One of their best features is the ability to access lists of books that are highly rated by users according to genre.
+
+Five years ago, these lists would have been accessible via an API. However, in 2020, Goodreads announced that it would no longer be granting API keys to new users as it looked to phase out API access for active developers that were already using the service. As far as I could find, Goodreads has not replaced their API from before 2020 with anything else. As I don't have a pre-2020 API key from Goodreads, my only access to these lists is via web scraping.
+
+### My Interest
+
+I am an avid reader, which means I am often looking for new reading material. There are four genres in particular that I frequently enjoy:
+
+-   biographies
+
+-   classics
+
+-   historical fiction
+
+-   mysteries
+
+I rarely come across a book from these genres that I won't at least read once. So I decided to scrape the lists of recommended books from these genres.
+
+## Preparation and Scraping
+
+```{r}
+#| label: loading packages
+library(knitr)              # for quarto functionality
+library(tidyverse)          # for dplyr and data wrangling
+library(httr)               # for web authentication
+library(rvest)              # for html tools
+library(magrittr)           # for piping and loops
+```
+
+To scrape the data, I created a function that would gather the books from a single page, fix some data entry mistakes (such as numbers vs characters), and return a data frame. I made a second function that would loop through the genres I wanted and get me the data from all of those pages while also keeping track of what genre each book was from.
+
+### Data Cleaning
+
+When I originally scraped the data, the rating, number of reviewers, and the year the book was published all came together in one text string. Part of the work of scraping this from the web was that I had to separate these out. I also had to remove commas from the number of reviewers and turn that into a number. A lot of excess text had to be removed.
+
+The cleaned up data from the Goodreads website then became a .CSV file which allows me to easily work with the data from the website and look at some basic analyses.
+
+```{r}
+#| label: loading in the CSV
+gr_data <- read_csv("https://myxavier-my.sharepoint.com/:x:/g/personal/mastilake_xavier_edu/EVTRpLfJsIdIijXkn217kNIBaHq5K9vIXL5DNPnYjbo2ag?download=1")
+```
+
+## Analysis
+
+### Genre with Highest Average Rating
+
+If I want my next read to be a book that's widely considered to be very good, which genre should I look at first? Does one of my favorite genre's tend to have higher ratings than the others?
+
+```{r}
+#| label: genre highest avg rate
+gr_data %>% 
+  ggplot(aes(x = Genres, y = rating)) +
+  geom_bar(stat = "summary", fun = "mean", fill = "steelblue") +
+  labs(title = "Average Rating by Genre", 
+            y = "Rating (Avg)")
+```
+
+From the above plot, it seems as though historical fiction tends to have higher reader reviews than the other genres. Classics have lower ratings than I thought. I suppose this makes sense due to so many people having to read classics for school, which might color their perception of the books.
+
+If I want to read a highly rated book next, I should look at the top of the historical fiction list.
+
+### Number of Ratings and Age
+
+Do older books have more ratings? In other words, have more people read the books that have been around the longest or have newer, popular books become popular enough through social media and the internet that they have been very widely read?
+
+```{r}
+#| label: r count by year 1
+gr_data %>% 
+  ggplot(aes(x = yearPublished, y = ratingsCount)) +
+  geom_point()
+```
+
+The Classics genre includes things like Dante Alighieri's *Inferno*, Geoffrey Chaucer's *Canterbury Tales,* and two of William Shakespeare's plays. These were all written before 1650. To improve readability, I will make 1650 my cutoff year. This will allow me to examine the trends more accurately, especially when we can compare the two graphs.
+
+```{r}
+#| label: r count by year 2
+gr_data %>% 
+  filter(yearPublished > 1650) %>% 
+  ggplot(aes(x = yearPublished, y = ratingsCount)) +
+  geom_point() +
+  labs(title = "Number of Ratings by Year Published", 
+       x = "Year Published", 
+       y = "Number of User Ratings")
+```
+
+As we can see from this graph, age doesn't seem to have much affect on how many people rate a book. The only notable feature in the graph is that the 1950s and 60s were good years for writing widely-read books. The most rated book is *To Kill a Mockingbird* by Harper Lee, published in 1960.
+
+### Rating and Age
+
+We've examined the relationship between age and the number of user ratings. Now, I'd like to see if older books have actually stood the test of time. Do older books have comparable ratings to modern books or is there a large disparity?
+
+```{r}
+#| label: rating and age 1
+gr_data %>% 
+  ggplot(aes(x = yearPublished, y = rating)) +
+  geom_point() +
+  labs(title = "Rating by Year Published", 
+       x = "Year Published", 
+       y = "User Rating")
+```
+
+Surprisingly, there is a fairly large difference between older and newer books with Goodreads users preferring more modern books for their reading. The highest rated books are two historical fiction books by Kristin Hannah and are tied for first place at 4.63. The older of the two books was written in 2015.
+
+Unfortunately for high school English teachers everywhere, Chaucer and Shakespeare sit firmly below a 4.00 rating.
+
+### Which Genre is Most Read
+
+I would next like to examine which of my favorite genres has the most readers. This might tell me which genres give me the best chance of being able to meet people that also enjoy those books. While online groups have helped facilitate global discussions, in-person bookclubs meeting at a coffee shop or bookstore are still the way to go.
+
+```{r}
+#| label: most read genre
+gr_data %>% 
+  ggplot(aes(x = Genres, y = ratingsCount)) +
+  geom_bar(stat = "identity", fill = "steelblue") +
+  labs(title = "Most Commonly Read Genre", 
+       y = "Number of User Ratings")
+```
+
+I wasn't originally planning on looking at this concept. I would have assumed that the classics would be the most read genre. However, the surprising results in the Number of Ratings by Year Published analysis (with Dante, Chaucer, and Shakespeare being less commonly read than I originally expected) inspired me to examine this further.
+
+Surprisingly, historical fiction has more people reading and rating those books with a fairly wide difference between the next highest. I was aware that historical fiction has become popular recently, but I didn't realize it was this popular.
+
+### Rating and Number of Ratings
+
+Lastly, I want to examine if the number of people who have read a book affects the rating. For example, are more widely read books likely to have a lower rating because a wider audience reads them and not everyone likes them?
+
+```{r}
+#| label: rating and count
+gr_data %>% 
+  ggplot(aes(x = ratingsCount, y = rating)) +
+  geom_point() +
+  labs(title = "Rating by Year Published", 
+       x = "Number of User Ratings", 
+       y = "User Rating")
+```
+
+There doesn't seem to be a discernible pattern between these two variables. I thought there might be some connection between them, but I seem to have been incorrect. It seems that having a smaller audience doesn't increase or decrease how your book will be rated on Goodreads.
+
+## Conclusion
+
+All in all, historical fiction seems to be the best thing for me to read next. It's highly rated with popular books and some modern authors. I've read some historical fiction already, but I've never done any serious research into the best books in that genre.
+
+Now, I have a new list of books to explore and an understanding of what other people think about those books.

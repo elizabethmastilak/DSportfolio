@@ -1,0 +1,7 @@
+"0","#| label: rating and count"
+"0","gr_data %>% "
+"0","  ggplot(aes(x = ratingsCount, y = rating)) +"
+"0","  geom_point() +"
+"0","  labs(title = ""Rating by Year Published"", "
+"0","       x = ""Number of User Ratings"", "
+"0","       y = ""User Rating"")"
