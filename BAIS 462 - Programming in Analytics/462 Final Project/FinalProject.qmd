@@ -1,0 +1,260 @@
+---
+title: "US Universities"
+author: "Elizabeth Mastilak"
+format:                   # Options related to formatting.
+  html:                   # Options related to HTML output.
+    # code-tools: TRUE      # Allow the code tools option showing in the output.
+    embed-resources: TRUE # Embeds all components into a single HTML file. 
+execute:                  # Options related to the execution of code chunks.
+  warning: FALSE          # FALSE: Code chunk sarnings are hidden by default.
+  message: FALSE          # FALSE: Code chunk messages are hidden by default.
+  echo:    FALSE           # TRUE:  Show all code in the output.
+editor: visual
+---
+
+# Introduction
+
+In the past semester, it has become increasingly apparent to me that academics in certain fields never quite stop thinking about academics. Conversations I have had in the past two weeks with my professors have covered
+
+-   whether or not I plan to attend grad school,
+
+-   where I plan to attend grad school,
+
+-   how to apply to "Research Experiences for Undergraduates," funded by the National Science Foundation,
+
+-   which graduate degrees I intend to get, and in what order, and
+
+-   topics for further research in mathematics.
+
+As a result of these conversations, I have been inspired to look in to the colleges and universities that awarded PhDs to some of the professors who are teaching at my school, as well as other schools that have come highly recommended to me for certain graduate programs.
+
+I will be examining the following seven schools:
+
+-   Auburn University
+
+-   Emory University
+
+-   Louisiana State University
+
+-   Michigan State University
+
+-   Pennsylvania State University
+
+-   Purdue University
+
+-   University of Cincinnati
+
+First, I will be analyzing these seven universities in comparison to other universities around the country. I will examine the types of students these universities enroll, how much these schools spend on their students, the faculty at these schools, and more. Finally, I will examine a handful of reviews for each university to determine if what students are saying matches with the how the college stands in the data.
+
+## Intro to the Data
+
+```{r}
+#| label: load packages
+library(knitr)                 # for quarto functionality
+library(tidyverse)             # for dplyr and data wrangling
+library(httr)                  # for web authentication
+library(rvest)                 # for html tools
+library(magrittr)              # for piping and loops
+library(chromote)              # Remotely controlling a Chrome browser
+library(jsonlite)              # Converting json data into data frames
+library(tidytext)              # Tidy text mining
+library(textdata)              # Lexicons of sentiment data
+library(widyr)                 # Easily calculating pairwise counts
+library(igraph)                # Special graphs for network analysis
+library(ggraph)                # An extension of ggplot for relational data used in networks
+library(PerformanceAnalytics)  # Used for a Correlation analysis
+```
+
+The data I will be using comes from Kaggle, a website that serves as a collection of data sets. More information about this data set can be found at <https://www.kaggle.com/datasets/yashgpt/us-college-data>.
+
+The data includes the number of applications, acceptances, enrollments, and the graduation rate for 777 schools. It includes information on what percent of the undergraduate students come from the top 10% and top 25% of their high schools. Other variables record some of the costs associated with attending each university, including for tuition, books, room and board, and even estimated personal costs. The data includes the percent of faculty with PhDs or other terminal degrees. Finally, there is a column dedicated to recording how much money the university spends per student.
+
+```{r}
+#| label: college data load
+college_data <- read_csv("https://myxavier-my.sharepoint.com/:x:/g/personal/mastilake_xavier_edu/EXCAL2IjOsJDinLFdm0WlrUBBdAu-Uhddudg2TgeKJmPDg?download=1")
+```
+
+The data for the reviews comes from Unigo.com, a website that allows users to share information about their college experience.
+
+```{r}
+#| label: unigo data load
+unigo_data <- read_csv("https://myxavier-my.sharepoint.com/:x:/g/personal/mastilake_xavier_edu/EfCKHYUS6IhGiqn6gooaUpEB4RKafuPCrRIIHiFzIIcgJw?download=1")
+```
+
+# Analysis
+
+My first step will be to identify the universities I'm interested in within the full data set of college data.
+
+```{r}
+#| label: identifying universities of interest
+
+interested_unis <- c("Auburn University-Main Campus",
+                     "Emory University",
+                     "Louisiana State University at Baton Rouge", 
+                     "Michigan State University",
+                     "Pennsylvania State Univ. Main Campus",
+                     "Purdue University at West Lafayette", 
+                     "University of Cincinnati")
+
+college_data <- 
+  college_data %>% 
+  mutate(my_colleges = ifelse(College %in% interested_unis, 1, 0)) %>% 
+  mutate(my_colleges = as.logical(my_colleges))
+```
+
+This will allow me to pick out these seven universities in my analysis.
+
+## Acceptance Rate
+
+One measure of a school's academics is how selective they are with their admissions offers. My question is, how do the seven schools I identified above compare to other colleges and universities around the country?
+
+Since the data I'm using doesn't specify acceptance rates, I will have to calculate this as a percent of the number of students who received an offer of the total number of students who applied.
+
+```{r}
+#| label: acceptance rate
+college_data <- college_data %>% 
+  mutate(acceptance = Accept/Apps)
+
+college_data %>% 
+  ggplot(aes(x=my_colleges, y = acceptance)) +
+  geom_boxplot() +
+  labs(title = "Acceptance Rate",
+       x = "Selected Universities",
+       y = "Acceptance Rate")
+```
+
+As shown above, most of these seven universities are large schools with a high acceptance rate. The median acceptance rate for the schools I'm interested in is 83%, compared to 78% for the other schools. This is a difference of 5 percentage points. With such a small sample size, I would argue that my identified universities are still comparable to the rest of the nation.
+
+## Desirability
+
+Another way to compare universities is to determine how many of their admitted applicants chose to enroll at that school, especially when compared to their acceptance rate. A high acceptance rate with a low actual enrollment rate suggests that a school is less selective, but not a desirable school. A school with a low acceptance rate but high actual enrollment rate suggests that the school is more desirable as most admitted students will choose that school.
+
+```{r}
+#| label: desirability
+college_data <- college_data %>% 
+  mutate(enrollment = Enroll/Accept)
+
+college_data %>% 
+  ggplot(aes(x = acceptance, y = enrollment, color = my_colleges)) +
+  geom_point() +
+  labs(title = "Enrollment Rate vs Acceptance Rate", 
+       x = "Acceptance Rate",
+       y = "Enrollment Rate")
+```
+
+Interestingly, there doesn't seem to be a strong trend. Schools with higher acceptance rates don't seem to automatically have higher actual enrollment rates. If that had been the case, there would be a more prominent downward slope to the graph.
+
+## Total Costs
+
+The data I have been using includes several variables that record costs associated with attending the university. I would like to aggregate those values into a "total costs" variable to determine how expensive these universities are, and how they compare to other schools.
+
+```{r}
+#| label: total costs
+college_data <- college_data %>% 
+  mutate(total_costs = Outstate + Room.Board + Books + Personal)
+
+college_data %>% 
+  ggplot(aes(x = my_colleges, y = total_costs)) +
+  geom_boxplot() +
+  labs(title = "Total Costs Associated with Attendance", 
+       x = "Selected Universities",
+       y = "Total Costs (USD)")
+```
+
+Based on the median total cost values, the universities I have picked out are comparable to other universities across the country. The outlier of the seven identified universities is Emory University in Georgia, a notably more prestigious school than some of the others in my list.
+
+## Spending on Students
+
+One would hope that a significant portion of the tuition costs for the more expensive schools would be put back into the student experience. While this is often not the case, spending more money on the students is still a desirable trait for a university to have. It demonstrates a care for the students and a goal to make the student experience better.
+
+```{r}
+#| label: spending on students - tuition
+college_data %>% 
+  ggplot(aes(x = Outstate, y = Expend, color = my_colleges)) +
+  geom_point() +
+  labs(title = "Expenditure per Student vs. Out of State Tuition", 
+       x = "Out of State Tuition (USD)",
+       y = "Expediture per Student")
+```
+
+Another question we might ask is, do larger schools spend more or less money on their students?
+
+```{r}
+#| label: spending on students - size
+college_data %>% 
+  ggplot(aes(x = F.Undergrad, y = Expend, color = my_colleges)) +
+  geom_point() +
+  labs(title = "Expenditure per Student vs. Out of State Tuition", 
+       x = "Number of Full-Time Undergraduates",
+       y = "Expediture per Student")
+```
+
+While there did seem to be a positive association between tuition and expenditure per student, there seems to be a very minor negative association between size and expenditure. This might suggest that choosing a smaller but slightly more expensive school might create a better student experience in terms of financial contributions from the school, while choosing a larger school might mean the school spends less money on you as an individual student.
+
+## Student Opinions
+
+Does a college spending more money or being more selective translate to better student opinions about that school?
+
+While my data set may be small, I believe that looking at these reviews will provide a snapshot of the student experience. This can then be compared to what the school is spending on students.
+
+```{r}
+#| label: unigo data wrangling
+unigo_data <- unigo_data %>% 
+  mutate(reviewID = row_number())
+
+tidy_unigo <- 
+  unigo_data %>% 
+  unnest_tokens(word, review_text) %>% 
+  anti_join(stop_words %>% data.frame() %>% filter(lexicon != "onix"))
+```
+
+```{r, fig.width=10, fig.height=6}
+#| label: valence scoring
+bing <- 
+  get_sentiments("bing")
+
+unigo_counts <- 
+  tidy_unigo %>% 
+  group_by(school_name, word) %>% 
+  summarize(n = n()) %>% 
+  inner_join(bing)
+
+# checking for positive and negative words
+unigo_counts %>%
+  group_by(school_name,sentiment) %>% 
+  summarize(n = n()) %>% 
+  arrange(-n)
+
+# Barplot for positive and negative words
+unigo_counts %>% 
+  filter(!(word %in% c("died", "fall"))) %>% 
+  group_by(school_name) %>% 
+  mutate(n = ifelse(sentiment == "negative", -n, n)) %>% 
+  mutate(word = reorder(word, n)) %>% 
+  ggplot(aes(word, n, fill = school_name)) +
+  geom_col() +
+  # coord_flip() +
+  #facet_wrap(~school_name, ncol = 2) +
+  geom_text(aes(label = signif(n, digits = 3)), nudge_y = 8) +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) +
+  labs(title = "Positive and Negative Words for Select Universities")
+```
+
+```{r}
+#| label: expenditures bar
+college_data %>% 
+  filter(my_colleges == TRUE) %>% 
+  ggplot(aes(x = College, y = Expend)) +
+  geom_col() + 
+  labs(title = "Expenditure per Student of Select Universities") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+```
+
+Emory University, Michigan State, and UC have largely positive reviews. Similarly, those three colleges spend more per student than the other four universities. This suggests that schools that spend more per student do in fact create better student experiences and students notice that.
+
+# Conclusion
+
+As expected, schools that demonstrate their care for their students tend to have better reviews. Unexpectedly, schools with lower acceptance rates don't automatically have more enrollments from the students they accept. As a topic for further study, it may be interesting to look at how many of the top schools in the country lose students to other top schools. For example, does Harvard have a low actual enrollment percent because their students also got into Yale and Princeton and picked one of those schools?
+
+While this brief analysis isn't going to decide where an undergraduate sophomore applies to PhD programs, this did prompt me to learn more about some of the schools that have produced some of Xavier University's faculty. Now, when asked about grad school plans, my answer can truly be that I've thought about it and I'm considering my options.
